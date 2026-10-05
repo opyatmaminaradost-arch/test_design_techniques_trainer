@@ -1,0 +1,453 @@
+```html
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Barber Booking Trainer v2</title>
+
+<style>
+body{font-family:Arial,sans-serif;background:#f4f5f7;margin:0;color:#111827}
+.wrap{max-width:900px;margin:36px auto;padding:0 18px}
+.card{background:white;border-radius:16px;padding:24px;box-shadow:0 8px 30px rgba(0,0,0,.08)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+label{display:block;font-weight:700;margin-bottom:6px}
+input,select,textarea{width:100%;box-sizing:border-box;padding:10px;border:1px solid #cbd5e1;border-radius:8px}
+button{padding:11px 18px;border:0;border-radius:9px;font-weight:700;cursor:pointer}
+.primary{background:#111827;color:#fff}
+.secondary{background:#e5e7eb}
+.row{display:flex;gap:10px;margin-top:18px}
+.hidden{display:none}
+.msg{margin-top:12px}
+.error{color:#b91c1c}
+.ok{color:#047857}
+a{color:#2563eb}
+.hint{background:#eef2ff;padding:12px;border-radius:10px;margin-bottom:20px}
+pre{background:#0f172a;color:#e2e8f0;padding:14px;border-radius:10px;overflow:auto;font-size:12px}
+
+@media(max-width:650px){
+  .grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+
+<body>
+
+<div class="wrap">
+<div class="card">
+
+<h1>Barber Booking Trainer v2</h1>
+
+<div class="hint">
+  <b>Interview mode:</b>
+  open DevTools → Network → Fetch/XHR.
+  The API contract is available in
+  <a href="/docs" target="_blank">Swagger</a>
+  and
+  <a href="/openapi.json" target="_blank">OpenAPI JSON</a>.
+</div>
+
+
+<section id="step1">
+
+  <h2>Step 1 — Service, Barber, Date</h2>
+
+  <div class="grid">
+
+    <div>
+      <label>Service</label>
+
+      <select id="service">
+        <option value="">Select a service</option>
+        <option value="haircut">Men's Haircut</option>
+        <option value="beard">Beard Trim</option>
+        <option value="combo">Haircut + Beard</option>
+      </select>
+    </div>
+
+
+    <div>
+      <label>Barber</label>
+
+      <select id="barber">
+        <option value="">Select a barber</option>
+        <option value="max">Max</option>
+        <option value="anna">Anna</option>
+        <option value="leo">Leonid</option>
+      </select>
+    </div>
+
+
+    <div>
+      <label>Date</label>
+
+      <input type="date" id="date">
+    </div>
+
+  </div>
+
+
+  <div class="row">
+    <button class="primary" onclick="nextStep()">Next</button>
+  </div>
+
+
+  <div id="m1" class="msg"></div>
+
+</section>
+
+
+<section id="step2" class="hidden">
+
+  <h2>Step 2 — Time Slot and Contact Details</h2>
+
+  <div class="grid">
+
+    <div>
+      <label>Time</label>
+      <select id="time"></select>
+    </div>
+
+
+    <div>
+      <label>Name</label>
+      <input
+        id="name"
+        maxlength="60"
+        placeholder="Sergei"
+      >
+    </div>
+
+
+    <div>
+      <label>Phone</label>
+      <input
+        id="phone"
+        placeholder="+79991234567"
+      >
+    </div>
+
+
+    <div>
+      <label>Email</label>
+      <input
+        id="email"
+        placeholder="test@example.com"
+      >
+    </div>
+
+  </div>
+
+
+  <div style="margin-top:16px">
+
+    <label>Comment</label>
+
+    <textarea
+      id="comment"
+      maxlength="500"
+    ></textarea>
+
+  </div>
+
+
+  <div style="margin-top:14px">
+
+    <label style="font-weight:400">
+
+      <input
+        id="consent"
+        type="checkbox"
+        style="width:auto"
+      >
+
+      I agree to the processing of personal data
+
+    </label>
+
+  </div>
+
+
+  <div class="row">
+
+    <button
+      class="secondary"
+      onclick="back()"
+    >
+      Back
+    </button>
+
+    <button
+      class="primary"
+      onclick="book()"
+    >
+      Book Appointment
+    </button>
+
+  </div>
+
+
+  <div id="m2" class="msg"></div>
+
+</section>
+
+
+<hr style="margin:28px 0;border:none;border-top:1px solid #ddd">
+
+
+<details>
+
+  <summary>
+    <b>Last Request / Response</b>
+  </summary>
+
+  <pre id="debug">No requests yet</pre>
+
+</details>
+
+
+<p style="margin-top:20px">
+
+  To verify the actual database record:
+
+  <a
+    href="/api/debug/bookings"
+    target="_blank"
+  >
+    /api/debug/bookings
+  </a>
+
+</p>
+
+
+</div>
+</div>
+
+
+<script>
+
+let step1 = {};
+
+
+function dbg(method, url, req, status, resp) {
+
+  document.getElementById("debug").textContent =
+
+    method + " " + url +
+
+    "\n\nREQUEST\n" +
+    JSON.stringify(req, null, 2) +
+
+    "\n\nSTATUS " +
+    status +
+
+    "\n\nRESPONSE\n" +
+    JSON.stringify(resp, null, 2);
+}
+
+
+async function nextStep() {
+
+  const body = {
+
+    serviceId:
+      document.getElementById("service").value,
+
+    barberId:
+      document.getElementById("barber").value,
+
+    date:
+      document.getElementById("date").value
+  };
+
+
+  const r = await fetch(
+    "/api/availability/check",
+    {
+      method: "POST",
+
+      headers: {
+        "Content-Type": "application/json"
+      },
+
+      body: JSON.stringify(body)
+    }
+  );
+
+
+  const data = await r.json();
+
+
+  dbg(
+    "POST",
+    "/api/availability/check",
+    body,
+    r.status,
+    data
+  );
+
+
+  if (!r.ok) {
+
+    document.getElementById("m1").innerHTML =
+
+      '<span class="error">' +
+      JSON.stringify(data) +
+      '</span>';
+
+    return;
+  }
+
+
+  step1 = body;
+
+
+  document.getElementById("time").innerHTML =
+
+    '<option value="">Select a time</option>' +
+
+    data.slots
+      .map(
+        x =>
+          `<option value="${x}">${x}</option>`
+      )
+      .join("");
+
+
+  document
+    .getElementById("step1")
+    .classList
+    .add("hidden");
+
+
+  document
+    .getElementById("step2")
+    .classList
+    .remove("hidden");
+}
+
+
+function back() {
+
+  document
+    .getElementById("step2")
+    .classList
+    .add("hidden");
+
+
+  document
+    .getElementById("step1")
+    .classList
+    .remove("hidden");
+}
+
+
+async function book() {
+
+  const prices = {
+    haircut: 2200,
+    beard: 1400,
+    combo: 3200
+  };
+
+
+  const body = {
+
+    serviceId:
+      step1.serviceId,
+
+    barberId:
+      step1.barberId,
+
+    date:
+      step1.date,
+
+    time:
+      document.getElementById("time").value,
+
+
+    customer: {
+
+      name:
+        document.getElementById("name").value,
+
+      phone:
+        document.getElementById("phone").value,
+
+      email:
+        document.getElementById("email").value || null
+    },
+
+
+    comment:
+      document.getElementById("comment").value,
+
+
+    consent:
+      document.getElementById("consent").checked,
+
+
+    // This field is intentionally sent by the frontend.
+    price:
+      prices[step1.serviceId]
+  };
+
+
+  const r = await fetch(
+    "/api/bookings",
+    {
+      method: "POST",
+
+      headers: {
+        "Content-Type": "application/json"
+      },
+
+      body:
+        JSON.stringify(body)
+    }
+  );
+
+
+  const data =
+    await r.json();
+
+
+  dbg(
+    "POST",
+    "/api/bookings",
+    body,
+    r.status,
+    data
+  );
+
+
+  if (!r.ok) {
+
+    document.getElementById("m2").innerHTML =
+
+      '<span class="error">' +
+      JSON.stringify(data) +
+      '</span>';
+
+    return;
+  }
+
+
+  document.getElementById("m2").innerHTML =
+
+    '<span class="ok">' +
+
+    'Booking created: ' +
+    data.bookingId +
+
+    ' | price=' +
+    data.price +
+
+    '</span>';
+}
+
+</script>
+
+</body>
+</html>
+```
